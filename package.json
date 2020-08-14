@@ -1,14 +1,14 @@
 {
-  "name": "nodebb-plugin-custom-registration-fields",
+  "name": "nodebb-plugin-itu-custom-registration-fields",
   "version": "1.3.2",
-  "description": "Adds custom fields to user registration page to input additional profile data",
+  "description": "Adds custom fields to user registration page to input additional profile data (for ITU forum)",
   "main": "library.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/btw6391/nodebb-plugin-custom-registration-fields.git"
+    "url": "git+https://github.com/redkiteio/nodebb-plugin-itu-custom-registration-fields.git"
   },
   "keywords": [
     "NodeBB",
@@ -17,12 +17,12 @@
     "registration",
     "fields"
   ],
-  "author": "btw6391 <btw6391@gmail.com>",
-  "license": "ISC",
+  "author": "Vardan Avetisyan <avetisyan@gmail.com>",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/btw6391/nodebb-plugin-custom-registration-fields/issues"
+    "url": "https://github.com/redkiteio/nodebb-plugin-itu-custom-registration-fields/issues"
   },
-  "homepage": "https://github.com/btw6391/nodebb-plugin-custom-registration-fields#readme",
+  "homepage": "https://github.com/redkiteio/nodebb-plugin-itu-custom-registration-fields#readme",
   "nbbpm": {
     "compatibility": "^1.5.0"
   }

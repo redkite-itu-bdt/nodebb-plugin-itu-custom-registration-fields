@@ -1,33 +1,64 @@
 "use strict";
 
 var customFields = {
-        npi : "", 
-        institution : "",
-        practicetype : "",
-        specialty : "",
-        practiceyears : ""
+        first_name : "",
+        last_name : "",
+        entity : "",
+        country : ""
     },
     customData = [],
-    user = module.parent.require('./user'),
-    db = module.parent.require('./database'),
+    user = require.main.require("./src/user"),
+    db = require.main.require("./src/database"),
+    async = require.main.require('async'),
+    winston = require.main.require('winston'),
+    batch = require.main.require('./src/batch'),
+    plugins = require.main.require('./src/plugins'),
     plugin = {};
 
+var createObjectKey = function (uid) {
+    return 'user:' + uid + ':ns:custom_fields';
+};
+
 plugin.init = function(params, callback) {
+    // var hostHelpers = require.main.require('./src/routes/helpers');
+
 	var app = params.router,
 		middleware = params.middleware,
 		controllers = params.controllers;
-		
-	app.get('/admin/custom-registration-fields', middleware.admin.buildHeader, renderAdmin);
-	app.get('/api/admin/custom-registration-fields', renderAdmin);
+
+	app.get('/admin/itu-custom-registration-fields', middleware.admin.buildHeader, renderAdmin);
+	app.get('/api/admin/itu-custom-registration-fields', renderAdmin);
+
+    // hostHelpers.setupPageRoute(data.router, '/generateFullCSV', data.middleware, [data.middleware.requireUser], function (req, res) {
+    //     res.render('plugins/itu-custom-registration-fields/csv', {
+    //         service: "ITU Custom Registration Fields",
+    //     });
+    // });
+    app.get('/generateFullCSV', [params.middleware.requireUser, params.middleware.applyCSRF], async function (req, res, next) {
+        var referer = req.headers.referer;
+
+        // if (!referer || !referer.replace(nconf.get('url'), '').startsWith('/admin/manage/users')) {
+        //     return res.status(403).send('[[error:invalid-origin]]');
+        // }
+        // events.log({
+        //     type: 'getUsersCSV',
+        //     uid: req.uid,
+        //     ip: req.ip,
+        // });
+        const data = await plugin.getUsersCSV();
+        res.attachment('users.csv');
+        res.setHeader('Content-Type', 'text/csv');
+        res.end(data);
+    });
 
 	callback();
 };
 
 plugin.addAdminNavigation = function(header, callback) {
 	header.plugins.push({
-		route: '/custom-registration-fields',
+		route: '/itu-custom-registration-fields',
 		icon: 'fa-tint',
-		name: 'Custom Registration Fields'
+		name: 'ITU Custom Registration Fields'
 	});
 
 	callback(null, header);
@@ -37,27 +68,23 @@ plugin.customHeaders = function(headers, callback) {
     for(var key in customFields) {
 
         switch(key) {
-            case 'npi':
-                var label = "NPI #";
+            case 'first_name':
+                var label = "First Name";
                 break;
-            
-            case 'institution':
-                var label = "Institution";
+
+            case 'last_name':
+                var label = "Last Name";
                 break;
-            
-            case 'practicetype':
-                var label = "Practice Type";
+
+            case 'entity':
+                var label = "Entity/Organization";
                 break;
-            
-            case 'specialty':
-                var label = "Specialty";
-                break;
-            
-            case 'practiceyears':
-                var label = "Practice Years";
+
+            case 'country':
+                var label = "Country";
                 break;
         }
-        
+
         headers.headers.push({
             label: label
         });
@@ -66,7 +93,7 @@ plugin.customHeaders = function(headers, callback) {
     callback(null, headers);
 };
 
-plugin.customFields = function(params, callback) {    
+plugin.customFields = function(params, callback) {
     var users = params.users.map(function(user) {
 
         if (!user.customRows) {
@@ -83,39 +110,70 @@ plugin.customFields = function(params, callback) {
     callback(null, {users: users});
 };
 
+plugin.csvFields = function(params, callback) {
+
+    callback(null, {fields: ['uid', 'email', 'username', 'first_name', 'last_name', 'entity', 'country', '']});
+};
+
+plugin.whitelistFields = function(params, callback) {
+    for(var key in customFields) {
+        params.whitelist.push(key);
+    }
+    return setImmediate(callback, null, params);
+};
+
+//
+// plugin.getFields = function(params, callback) {
+//
+//     console.log(params);
+//     var users = params.users.map(function(user) {
+//
+//         for(var key in customFields) {
+//             user[key] = 'aaa';
+//         }
+//
+//         return user;
+//     });
+//
+//     callback(null, {users: users});
+// };
+
+plugin.getUsers = function(users, callback) {
+    console.log('getUsers called');
+    async.map(users, plugin.addCustomFields , function(err, users1) {
+        callback(null, users1);
+    });
+};
+
 plugin.addField = function(params, callback) {
     for(var key in customFields) {
-        
+
         if (key == "") {
             callback(null, params);
             return;
         }
 
         switch(key) {
-            case 'npi':
-                var html = '<input class="form-control" type="text" name="npi" id="npi" placeholder="Enter NPI #"><span class="custom-feedback" id="npi-notify"></span><span class="help-block">A unique 10-digit identification number.</span>';
-                var label = "NPI #";
+            case 'first_name':
+                var html = '<input class="form-control" type="text" name="first_name" id="first_name" placeholder="First Name"><span class="custom-feedback" id="first_name-notify"></span>';
+                var label = "First Name";
                 break;
-            
-            case 'institution':
-                var html = '<input class="form-control" type="text" name="institution" id="institution" placeholder="Enter Institution"><span class="custom-feedback" id="institution-notify"></span>';
-                var label = "Institution";
+
+            case 'last_name':
+                var html = '<input class="form-control" type="text" name="last_name" id="last_name" placeholder="Last Name"><span class="custom-feedback" id="last_name-notify"></span>';
+                var label = "Last Name";
                 break;
-            
-            case 'practicetype':
-                var html = '<select class="form-control" name="practicetype" id="practicetype"><option value="" disabled="" selected="">Select your practice type</option><option value="1">Academic</option><option value="2">Community</option><option value="3">Hospital</option></select><span class="custom-feedback" id="practice-notify"></span>';
-                var label = "Practice Type";
+
+            case 'entity':
+                var html = '<input class="form-control" type="text" name="entity" id="entity" placeholder="Entity/Organization"><span class="custom-feedback" id="entity-notify"></span>';
+                var label = "Entity/Organization";
                 break;
-            
-            case 'specialty':
-                var html = '<select class="form-control" name="specialty" id="specialty"><option value="" disabled="" selected="">Select your specialty</option><option value="1">Oncology</option><option value="2">Hematology</option><option value="3">Oncology/Hematology</option><option value="4">Radiation Oncology</option><option value="5">Nuclear Medicine</option><option value="5">Surgery</option></select><span class="custom-feedback" id="specialty-notify"></span>';
-                var label = "Specialty";
+
+            case 'country':
+                var html = '<input class="form-control" type="text" name="country" id="country" placeholder="Country"><span class="custom-feedback" id="country-notify"></span>';
+                var label = "Country";
                 break;
-            
-            case 'practiceyears':
-                var html = '<select class="form-control" name="practiceyears" id="practiceyears"><option value="" disabled="" selected="">Select your years in practice</option><option value="1">In Training</option><option value="2">1 to 3 Years</option><option value="3">4 to 7 Years</option><option value="4">8 to 10 Years</option><option value="5">&gt;10 Years</option></select><span class="custom-feedback" id="years-notify"></span>';
-                var label = "Practice Years";
-                break;
+
         }
 
         var captcha = {
@@ -141,16 +199,7 @@ plugin.checkField = function(params, callback) {
 
         var value = userData[key];
 
-        if (key == 'npi') {
-            if (value.length != 10) {
-                error = {message: 'NPI # must be 10 digits'};
-            }
-            else if (!/^[0-9]+$/.test(value)) {
-                error = {message: 'NPI # must be a numerical value'};
-            }
-        }
-
-        else if (value == "" || value == undefined) {
+        if (value == "" || value == undefined) {
             error = {message: 'Please complete all fields before registering.'};
         }
     }
@@ -166,14 +215,13 @@ plugin.creatingUser = function(params, callback) {
 
 plugin.createdUser = function(params) {
     var addCustomData = {
-        npi : customData[0].value, 
-        institution : customData[1].value,
-        practicetype : customData[2].value,
-        specialty : customData[3].value,
-        practiceyears : customData[4].value
-    }
+        first_name : customData[0].value,
+        last_name : customData[1].value,
+        entity : customData[2].value,
+        country : customData[3].value
+    };
 
-    var keyID = 'user:' + params.uid + ':ns:custom_fields';
+    var keyID = 'user:' + params.user.uid + ':ns:custom_fields';
 
     db.setObject(keyID, addCustomData, function(err) {
         if (err) {
@@ -191,27 +239,23 @@ plugin.addToApprovalQueue = function(params, callback) {
     for (var key in customFields) {
 
         switch(key) {
-            case 'npi':
-                var fieldData = params.userData['npi'];
+            case 'first_name':
+                var fieldData = params.userData['first_name'];
                 break;
-            
-            case 'institution':
-                var fieldData = params.userData['institution'];
+
+            case 'last_name':
+                var fieldData = params.userData['last_name'];
                 break;
-            
-            case 'practicetype':
-                var fieldData = params.userData['practicetype'];
+
+            case 'entity':
+                var fieldData = params.userData['entity'];
                 break;
-            
+
             case 'specialty':
-                var fieldData = params.userData['specialty'];
-                break;
-            
-            case 'practiceyears':
-                var fieldData = params.userData['practiceyears'];
+                var country = params.userData['country'];
                 break;
         }
-        
+
         customFields[key] = fieldData;
         data.customRows.push({value: customFields[key]});
     }
@@ -219,8 +263,102 @@ plugin.addToApprovalQueue = function(params, callback) {
     callback(null, {data: data, userData: userData});
 };
 
+plugin.getUsersCSV = async function () {
+    winston.verbose('[user/getUsersCSV] Compiling User CSV data');
+
+    const data = await plugins.fireHook('filter:user.csvFields', { fields: ['uid', 'email', 'username'] });
+    let csvContent = data.fields.join(',') + '\n';
+    await batch.processSortedSet('users:joindate', async (uids) => {
+        const usersData = await user.getUsersFields(uids, data.fields);
+        console.log(usersData);
+        csvContent += usersData.reduce((memo, user) => {
+            memo += user.email + ',' + user.username + ',' + user.uid + ',' + user.first_name + ',' + user.last_name + ',' + user.entity +',' + user.country + '\n';
+            return memo;
+        }, '');
+    }, {});
+
+    return csvContent;
+};
+
+plugin.getClientFields = function (uid, done) {
+    db.getObject(createObjectKey(uid), done);
+};
+
+plugin.getFields = function (done) {
+    async.waterfall([
+        function (next) {
+            //key, start, stop, callback
+            db.getSortedSetRange('ns:custom_fields', 0, -1, next);
+        },
+        function (ids, next) {
+            if (!ids.length) {
+                return next(null, ids);
+            }
+            db.getObjects(ids.map(function (id) {
+                return 'ns:custom_fields' + ':' + id;
+            }), next);
+        }
+    ], done);
+};
+
+plugin.getCustomFields = function (uid, callback) {
+    console.log('getCustomFields called');
+    async.parallel({
+        fields: async.apply(plugin.getFields),
+        data  : async.apply(plugin.getClientFields, uid)
+    }, function (error, result) {
+        if (error) {
+            return callback(error);
+        }
+
+        var customFields1 = {};
+
+        if (result.data) {
+            //Reduce to only populated fields
+            var i = 0, len = result.fields.length, fieldMeta;
+            for (i; i < len; ++i) {
+                fieldMeta = result.fields[i];
+                var value = result.data[fieldMeta.key];
+                if (value) {
+                    customFields1[fieldMeta.key] = value;
+                }
+            }
+        }
+
+        callback(null, customFields1);
+    });
+};
+
+plugin.addCustomFields = function (user, callback) {
+    console.log('addCustomFields called');
+    var uid = user.uid;
+    async.parallel({
+        fields: async.apply(plugin.getFields),
+        data  : async.apply(plugin.getClientFields, uid)
+    }, function (error, result) {
+        if (error) {
+            return callback(error);
+        }
+
+
+        if (result.data) {
+            //Reduce to only populated fields
+            var i = 0, len = result.fields.length, fieldMeta;
+            for (i; i < len; ++i) {
+                fieldMeta = result.fields[i];
+                var value = result.data[fieldMeta.key];
+                if (value) {
+                    user[fieldMeta.key] = value;
+                }
+            }
+        }
+
+        callback(null, user);
+    });
+};
+
 function renderAdmin(req, res, next) {
-	res.render('admin/custom-registration-fields', {fields: customFields});
+	res.render('admin/itu-custom-registration-fields', {fields: customFields});
 }
 
 module.exports = plugin;

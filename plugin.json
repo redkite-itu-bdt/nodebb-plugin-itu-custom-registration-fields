@@ -1,8 +1,8 @@
 {
-	"id": "nodebb-plugin-custom-registration-fields",
-	"name": "Custom Registration Fields",
+	"id": "nodebb-plugin-itu-custom-registration-fields",
+	"name": "Custom Registration Fields for ITU Forum",
 	"description": "Adds custom fields to user registration page to input additional profile data",
-	"url": "https://github.com/btw6391/nodebb-plugin-custom-registration-fields",
+	"url": "https://github.com/redkiteio/nodebb-plugin-itu-custom-registration-fields",
 	"library": "./library.js",
 	"hooks": [
 		{ "hook": "static:app.load", "method": "init" },
@@ -11,6 +11,10 @@
 		{ "hook": "filter:register.check", "method": "checkField" },
         { "hook": "filter:admin.registrationQueue.customHeaders", "method": "customHeaders" },
         { "hook": "filter:user.getRegistrationQueue", "method": "customFields" },
+		{ "hook": "filter:user.csvFields", "method": "csvFields" },
+		{ "hook": "filter:user.getFields", "method": "getFields" },
+        { "hook": "filter:user.whitelistFields", "method": "whitelistFields" },
+        { "hook": "filter:users.get", "method": "getUsers" },
         { "hook": "filter:user.create", "method": "creatingUser" },
 		{ "hook": "action:user.create", "method": "createdUser" },
         { "hook": "filter:user.addToApprovalQueue", "method": "addToApprovalQueue" }

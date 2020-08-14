@@ -1,1 +1,0 @@
-<h1>Custom Registration Fields - Enabled</h1>

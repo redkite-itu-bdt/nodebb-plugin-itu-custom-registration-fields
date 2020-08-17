@@ -20,31 +20,21 @@ var createObjectKey = function (uid) {
 };
 
 plugin.init = function(params, callback) {
-    // var hostHelpers = require.main.require('./src/routes/helpers');
 
 	var app = params.router,
-		middleware = params.middleware,
-		controllers = params.controllers;
+		middleware = params.middleware;
 
 	app.get('/admin/itu-custom-registration-fields', middleware.admin.buildHeader, renderAdmin);
 	app.get('/api/admin/itu-custom-registration-fields', renderAdmin);
 
-    // hostHelpers.setupPageRoute(data.router, '/generateFullCSV', data.middleware, [data.middleware.requireUser], function (req, res) {
-    //     res.render('plugins/itu-custom-registration-fields/csv', {
-    //         service: "ITU Custom Registration Fields",
-    //     });
-    // });
+
     app.get('/generateFullCSV', [params.middleware.requireUser, params.middleware.applyCSRF], async function (req, res, next) {
         var referer = req.headers.referer;
 
-        // if (!referer || !referer.replace(nconf.get('url'), '').startsWith('/admin/manage/users')) {
-        //     return res.status(403).send('[[error:invalid-origin]]');
-        // }
-        // events.log({
-        //     type: 'getUsersCSV',
-        //     uid: req.uid,
-        //     ip: req.ip,
-        // });
+        if (!referer || !referer.replace(nconf.get('url'), '').startsWith('/admin/')) {
+            return res.status(403).send('[[error:invalid-origin]]');
+        }
+
         const data = await plugin.getUsersCSV();
         res.attachment('users.csv');
         res.setHeader('Content-Type', 'text/csv');
@@ -121,22 +111,6 @@ plugin.whitelistFields = function(params, callback) {
     }
     return setImmediate(callback, null, params);
 };
-
-//
-// plugin.getFields = function(params, callback) {
-//
-//     console.log(params);
-//     var users = params.users.map(function(user) {
-//
-//         for(var key in customFields) {
-//             user[key] = 'aaa';
-//         }
-//
-//         return user;
-//     });
-//
-//     callback(null, {users: users});
-// };
 
 plugin.getUsers = function(users, callback) {
     console.log('getUsers called');
@@ -264,7 +238,6 @@ plugin.addToApprovalQueue = function(params, callback) {
 };
 
 plugin.getUsersCSV = async function () {
-    winston.verbose('[user/getUsersCSV] Compiling User CSV data');
 
     const data = await plugins.fireHook('filter:user.csvFields', { fields: ['uid', 'email', 'username'] });
     let csvContent = data.fields.join(',') + '\n';
@@ -302,7 +275,6 @@ plugin.getFields = function (done) {
 };
 
 plugin.getCustomFields = function (uid, callback) {
-    console.log('getCustomFields called');
     async.parallel({
         fields: async.apply(plugin.getFields),
         data  : async.apply(plugin.getClientFields, uid)
@@ -330,7 +302,6 @@ plugin.getCustomFields = function (uid, callback) {
 };
 
 plugin.addCustomFields = function (user, callback) {
-    console.log('addCustomFields called');
     var uid = user.uid;
     async.parallel({
         fields: async.apply(plugin.getFields),
@@ -339,7 +310,6 @@ plugin.addCustomFields = function (user, callback) {
         if (error) {
             return callback(error);
         }
-
 
         if (result.data) {
             //Reduce to only populated fields
